@@ -52,7 +52,7 @@ export default function App() {
   );
 
   // サンプルデータ（x と width のみで指定）
-  const units = useMemo(
+  const [units, setUnits] = useState(
     () => [
       // 17F
       { id: "1701", name: "1701", floors: [17], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "田中太郎", startDate: "2023-04-01", endDate: "2025-03-31", rent: 85000, deposit: 170000 } },
@@ -113,14 +113,16 @@ export default function App() {
       { id: "1404", name: "1404", floors: [14], x: 415, width: 130, status: "reserved", note: "契約編集中", contract: { tenant: "田村健一", startDate: "2024-08-01", endDate: "2026-07-31", rent: 105000, deposit: 210000 } },
       { id: "1405", name: "1405", floors: [14], x: 550, width: 180, status: "occupied", note: "長期賃貸", contract: { tenant: "株式会社XYZ", startDate: "2020-03-01", endDate: "2025-02-28", rent: 195000, deposit: 390000 } },
       { id: "1406", name: "1406", floors: [14], x: 735, width: 110, status: "hold", note: "内見予定" },
-    ],
-    []
+    ]
   );
 
   const [selected, setSelected] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ status: '', note: '' });
+  const [hasChanges, setHasChanges] = useState(false);
 
   // 認証関数
   const handleLogin = (e) => {
@@ -147,6 +149,72 @@ export default function App() {
     const { name, value } = e.target;
     setLoginData(prev => ({ ...prev, [name]: value }));
     if (loginError) setLoginError('');
+  };
+
+  // 編集機能
+  const handleEditClick = () => {
+    if (selected) {
+      setEditData({
+        status: selected.status,
+        note: selected.note || ''
+      });
+      setIsEditing(true);
+    }
+  };
+
+  // 区画選択時に編集モードを自動開始
+  const handleUnitSelect = (unit) => {
+    setSelected(unit);
+    setEditData({
+      status: unit.status,
+      note: unit.note || ''
+    });
+    setIsEditing(true);
+    setHasChanges(false);
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditData(prev => ({ ...prev, [name]: value }));
+    
+    // 変更があったかチェック
+    if (selected) {
+      const hasStatusChange = name === 'status' && value !== selected.status;
+      const hasNoteChange = name === 'note' && value !== (selected.note || '');
+      setHasChanges(hasStatusChange || hasNoteChange);
+    }
+  };
+
+  const handleSave = () => {
+    if (selected) {
+      // 区画データを更新
+      setUnits(prevUnits => 
+        prevUnits.map(unit => 
+          unit.id === selected.id 
+            ? { ...unit, status: editData.status, note: editData.note }
+            : unit
+        )
+      );
+      
+      // 選択中の区画も更新
+      setSelected(prev => ({
+        ...prev,
+        status: editData.status,
+        note: editData.note
+      }));
+      
+      setHasChanges(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (selected) {
+      setEditData({
+        status: selected.status,
+        note: selected.note || ''
+      });
+      setHasChanges(false);
+    }
   };
 
   // ヘルパ
@@ -373,7 +441,7 @@ export default function App() {
         </button>
       </header>
 
-      <main className={`layout ${selected ? 'with-panel' : 'without-panel'}`} onClick={() => setSelected(null)}>
+      <main className={`layout ${selected ? 'with-panel' : 'without-panel'}`}>
         <section className="canvas-wrap" role="region" aria-label="区画断面図" onClick={(e) => e.stopPropagation()}>
           <div className="building-header">
             <div className="building-icon">🏢</div>
@@ -446,7 +514,7 @@ export default function App() {
             {normalizedUnits.map((u) => {
               const base = STATUS_BASE[u.status] || "#cbd5e1";
               const fill = STATUS_FILL[u.status] || "#f8fafc";
-              const onClick = () => setSelected(u);
+              const onClick = () => handleUnitSelect(u);
               const isSelected = selected?.id === u.id;
 
               // 単階 or 縦長（矩形）
@@ -685,15 +753,44 @@ export default function App() {
               <div className="row">
                 <span className="k">契約状況</span>
                 <span className="v">
-                  <span className="status-badge" style={{ backgroundColor: STATUS_BASE[selected.status] || "#cbd5e1" }}>
-                    {statusLabel(selected.status)}
-                  </span>
+                  <select 
+                    name="status" 
+                    value={editData.status} 
+                    onChange={handleEditChange}
+                    className="edit-select"
+                  >
+                    <option value="vacant">空室</option>
+                    <option value="reserved">申込</option>
+                    <option value="occupied">入居中</option>
+                    <option value="maintenance">工事</option>
+                    <option value="hold">保留</option>
+                  </select>
                 </span>
               </div>
               <div className="row">
                 <span className="k">メモ</span>
-                <span className="v">{selected.note || "-"}</span>
+                <span className="v">
+                  <textarea 
+                    name="note" 
+                    value={editData.note} 
+                    onChange={handleEditChange}
+                    className="edit-textarea"
+                    placeholder="メモを入力..."
+                    rows="3"
+                  />
+                </span>
               </div>
+              
+              {hasChanges && (
+                <div className="edit-actions">
+                  <button className="save-btn" onClick={handleSave}>
+                    保存
+                  </button>
+                  <button className="cancel-btn" onClick={handleCancel}>
+                    キャンセル
+                  </button>
+                </div>
+              )}
               
               {(selected.status === "reserved" || selected.status === "occupied") && selected.contract && (
                 <div className="contract-section">
@@ -1164,10 +1261,83 @@ function Style() {
      color: var(--primary);
      margin: 0 0 12px 0;
    }
-   .contract-details {
-     display: grid;
-     gap: 8px;
-   }
+  .contract-details {
+    display: grid;
+    gap: 8px;
+  }
+  .edit-actions {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+  .edit-btn, .save-btn, .cancel-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+  }
+  .edit-btn {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .edit-btn:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+  .save-btn {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .save-btn:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+  }
+  .cancel-btn {
+    background: #6b7280;
+    color: white;
+    border-color: #6b7280;
+  }
+  .cancel-btn:hover {
+    background: #4b5563;
+    border-color: #4b5563;
+  }
+  .edit-select {
+    width: 100%;
+    padding: 6px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+  }
+  .edit-select:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+  .edit-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 60px;
+    transition: border-color 0.2s ease;
+  }
+  .edit-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
   .unit-shape {
     cursor:pointer;
     stroke-width:2;
