@@ -14,14 +14,183 @@ import React, { useMemo, useState } from "react";
  *   - [top, bottom] や { top, bottom, align } も引き続き描画可能（L字）
  */
 
+// 物件定義
+const PROPERTIES = [
+  { id: "hills", name: "〇〇ヒルズ", floors: [17, 16, 15, 14], buildingWidth: 1100 },
+  { id: "aoyama", name: "青山タワー", floors: [28, 27, 26, 25], buildingWidth: 1200 },
+];
+
+// 「〇〇ヒルズ」= 既存のモックをそのまま移植
+const HILLS_UNITS = [
+  // 17F
+  { id: "1701", name: "1701", floors: [17], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "田中太郎", startDate: "2023-04-01", endDate: "2025-03-31", rent: 85000, deposit: 170000 } },
+  { id: "1702", name: "1702", floors: [17], x: 145, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "佐藤花子", startDate: "2024-02-01", endDate: "2026-01-31", rent: 120000, deposit: 240000 } },
+  { id: "1703", name: "1703", floors: [17], x: 280, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "山田次郎", startDate: "2024-03-15", endDate: "2026-03-14", rent: 115000, deposit: 230000 } },
+  { id: "1704", name: "1704", floors: [17], x: 415, width: 130, status: "vacant", note: "LIGHT, 1BR" },
+
+  // メゾネット（新仕様）— 左寄せ、上階の幅=180（上下同幅で縦長表示）
+  {
+    id: "1605",
+    name: "1605 メゾネット",
+    floors: [17, 16],
+    x: 550,
+    isMaisonette: true,
+    align: "left",
+    width: { top: 80, bottom: 180 }, // 上階の幅のみ指定（下階は自動的に同幅）
+    status: "reserved",
+    note: "DARK, 3BR メゾネット（左寄せ・上下異幅）",
+    contract: { tenant: "鈴木一郎", startDate: "2024-01-01", endDate: "2025-12-31", rent: 180000, deposit: 360000 }
+  },
+  { id: "1705", name: "1705", floors: [17], x: 635, width: 110, status: "vacant", note: "LIGHT, 1BR" },
+  { id: "1706", name: "1706", floors: [17], x: 750, width: 110, status: "vacant", note: "DARK, 1BR" },
+  { id: "1707", name: "1707", floors: [17], x: 865, width: 170, status: "model", note: "モデルルーム 2BR" },
+
+  // 16F
+  { id: "1601", name: "1601", floors: [16], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "高橋美咲", startDate: "2022-06-01", endDate: "2024-05-31", rent: 90000, deposit: 180000 } },
+  { id: "1602", name: "1602", floors: [16], x: 145, width: 130, status: "reserved", note: "DARK, 3BR", contract: { tenant: "伊藤健太", startDate: "2024-04-01", endDate: "2026-03-31", rent: 125000, deposit: 250000 } },
+  { id: "1603", name: "1603", floors: [16], x: 280, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "中村由美", startDate: "2024-05-01", endDate: "2026-04-30", rent: 130000, deposit: 260000 } },
+  { id: "1604", name: "1604", floors: [16], x: 415, width: 130, status: "special", note: "SA" },
+  { id: "1606", name: "1606", floors: [16], x: 735, width: 160, status: "maintenance", note: "設備/工事" },
+  { id: "1607", name: "1607", floors: [16], x: 900, width: 135, status: "vacant", note: "DARK, 1BR" },
+
+  // 15F
+  { id: "1501", name: "1501", floors: [15], x: 10, width: 130, status: "reserved", note: "DARK, 2BR", contract: { tenant: "小林正雄", startDate: "2024-06-01", endDate: "2026-05-31", rent: 95000, deposit: 190000 } },
+  { id: "1502", name: "1502", floors: [15], x: 145, width: 130, status: "vacant", note: "LIGHT, 2BR" },
+  { id: "1503", name: "1503", floors: [15], x: 280, width: 130, status: "hold", note: "内見予定" },
+  { id: "1504", name: "1504", floors: [15], x: 415, width: 130, status: "reserved", note: "契約編集中", contract: { tenant: "斎藤真理", startDate: "2024-07-01", endDate: "2026-06-30", rent: 100000, deposit: 200000 } },
+  { id: "1505", name: "1505", floors: [15], x: 550, width: 180, status: "occupied", note: "長期賃貸", contract: { tenant: "株式会社ABC", startDate: "2021-01-01", endDate: "2026-12-31", rent: 200000, deposit: 400000 } },
+  { id: "1506", name: "1506", floors: [15], x: 735, width: 190, status: "special", note: "SA 2BR" },
+
+  // メゾネット（新仕様）— 右寄せ、上下の幅をそれぞれ指定
+  {
+    id: "1407",
+    name: "1407 メゾネット",
+    floors: [15, 14],
+    x: 930,
+    isMaisonette: true,
+    align: "right",
+    width: { top: 100, bottom: 180 }, // 上階50px、下階80px
+    status: "vacant",
+    note: "LIGHT, 3BR メゾネット（右寄せ・上下異幅）",
+  },
+
+  // 14F
+  { id: "1401", name: "1401", floors: [14], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "松本和子", startDate: "2023-09-01", endDate: "2025-08-31", rent: 88000, deposit: 176000 } },
+  { id: "1402", name: "1402", floors: [14], x: 145, width: 130, status: "vacant", note: "LIGHT, 2BR" },
+  { id: "1403", name: "1403", floors: [14], x: 280, width: 130, status: "maintenance", note: "リノベ中" },
+  { id: "1404", name: "1404", floors: [14], x: 415, width: 130, status: "reserved", note: "契約編集中", contract: { tenant: "田村健一", startDate: "2024-08-01", endDate: "2026-07-31", rent: 105000, deposit: 210000 } },
+  { id: "1405", name: "1405", floors: [14], x: 550, width: 180, status: "occupied", note: "長期賃貸", contract: { tenant: "株式会社XYZ", startDate: "2020-03-01", endDate: "2025-02-28", rent: 195000, deposit: 390000 } },
+  { id: "1406", name: "1406", floors: [14], x: 735, width: 110, status: "hold", note: "内見予定" },
+];
+
+// 追加モック: さくらレジデンス
+const SAKURA_UNITS = [
+  // 12F
+  { id: "1201", name: "1201", floors: [12], x: 10, width: 130, status: "occupied", note: "2BR" },
+  { id: "1202", name: "1202", floors: [12], x: 145, width: 130, status: "reserved", note: "3BR" },
+  { id: "1203", name: "1203", floors: [12], x: 280, width: 140, status: "vacant", note: "1BR" },
+  { id: "1204", name: "1204", floors: [12], x: 425, width: 160, status: "special", note: "SA" },
+  { id: "1205", name: "1205", floors: [12], x: 590, width: 140, status: "model", note: "モデル" },
+  { id: "1206", name: "1206", floors: [12], x: 735, width: 230, status: "hold", note: "内見予定" },
+
+  // 11F
+  { id: "1101", name: "1101", floors: [11], x: 10, width: 140, status: "occupied", note: "法人契約" },
+  { id: "1102", name: "1102", floors: [11], x: 155, width: 140, status: "special", note: "SOHO" },
+  {
+    id: "1103M", name: "1103 メゾネット", floors: [11, 10], x: 310,
+    isMaisonette: true, align: "left", width: { top: 90, bottom: 170 },
+    status: "reserved", note: "3BR メゾネット",
+  },
+  { id: "1104", name: "1104", floors: [11], x: 485, width: 180, status: "maintenance", note: "工事中" },
+  { id: "1105", name: "1105", floors: [11], x: 670, width: 150, status: "vacant", note: "1BR" },
+  { id: "1106", name: "1106", floors: [11], x: 825, width: 145, status: "vacant", note: "1BR" },
+
+  // 10F
+  { id: "1001", name: "1001", floors: [10], x: 10, width: 140, status: "occupied", note: "長期" },
+  { id: "1002", name: "1002", floors: [10], x: 155, width: 140, status: "reserved", note: "申込" },
+  { id: "1004", name: "1004", floors: [10], x: 485, width: 180, status: "maintenance", note: "工事中" },
+  { id: "1005", name: "1005", floors: [10], x: 670, width: 150, status: "reserved", note: "調整中" },
+  { id: "1006", name: "1006", floors: [10], x: 825, width: 145, status: "hold", note: "内見予定" },
+
+  // 9F
+  { id: "0901", name: "0901", floors: [9], x: 10, width: 180, status: "occupied", note: "2BR" },
+  { id: "0902", name: "0902", floors: [9], x: 195, width: 150, status: "reserved", note: "2BR" },
+  { id: "0904", name: "0904", floors: [9], x: 350, width: 150, status: "model", note: "モデル" },
+  { id: "0905", name: "0905", floors: [9], x: 505, width: 200, status: "maintenance", note: "改修" },
+  {
+    id: "0906M", name: "0906 メゾネット", floors: [9, 8], x: 720,
+    isMaisonette: true, align: "right", width: { top: 220, bottom: 180 },
+    status: "vacant", note: "2BR メゾネット(右寄せ)",
+  },
+
+  // 8F
+  { id: "0801", name: "0801", floors: [8], x: 10, width: 180, status: "vacant", note: "1BR" },
+  { id: "0802", name: "0802", floors: [8], x: 195, width: 150, status: "hold", note: "調整中" },
+  { id: "0804", name: "0804", floors: [8], x: 350, width: 150, status: "model", note: "モデル" },
+  { id: "0805", name: "0805", floors: [8], x: 505, width: 200, status: "maintenance", note: "改修" },
+];
+
+// 追加モック: 青山タワー
+const AOYAMA_UNITS = [
+  // 28F
+  { id: "2801", name: "2801", floors: [28], x: 10, width: 150, status: "occupied", note: "2BR" },
+  { id: "2802", name: "2802", floors: [28], x: 165, width: 180, status: "reserved", note: "3BR" },
+  { id: "2803", name: "2803", floors: [28], x: 350, width: 180, status: "vacant", note: "1BR" },
+  { id: "2804", name: "2804", floors: [28], x: 535, width: 200, status: "model", note: "モデル" },
+  { id: "2805", name: "2805", floors: [28], x: 885, width: 120, status: "special", note: "SA" },
+  { id: "2806", name: "2806", floors: [28], x: 1010, width: 175, status: "special", note: "SA" },
+
+  // 27F
+  { id: "2701", name: "2701", floors: [27], x: 10, width: 200, status: "occupied", note: "法人" },
+  { id: "2702", name: "2702", floors: [27], x: 215, width: 140, status: "maintenance", note: "工事" },
+  { id: "2703", name: "2703", floors: [27], x: 360, width: 180, status: "reserved", note: "申込" },
+  { id: "2704", name: "2704", floors: [27], x: 545, width: 190, status: "vacant", note: "1BR" },
+  {
+    id: "2705M", name: "2705 メゾネット", floors: [28, 27], x: 740,
+    isMaisonette: true, align: "left", width: { top: 140, bottom: 260 },
+    status: "hold", note: "3BR メゾネット",
+  },
+  { id: "2706", name: "2706", floors: [27], x: 1005, width: 175, status: "vacant", note: "1BR" },
+
+  // 26F
+  { id: "2601", name: "2601", floors: [26], x: 10, width: 160, status: "occupied", note: "2BR" },
+  { id: "2602", name: "2602", floors: [26], x: 175, width: 160, status: "special", note: "SOHO" },
+  { id: "2603", name: "2603", floors: [26], x: 340, width: 180, status: "model", note: "モデル" },
+  { id: "2604", name: "2604", floors: [26], x: 525, width: 200, status: "maintenance", note: "改修" },
+  { id: "2605", name: "2605", floors: [26], x: 730, width: 160, status: "vacant", note: "1BR" },
+  { id: "2606", name: "2606", floors: [26], x: 895, width: 185, status: "vacant", note: "1BR" },
+
+  // 25F
+  { id: "2501", name: "2501", floors: [25], x: 10, width: 160, status: "occupied", note: "長期" },
+  { id: "2502", name: "2502", floors: [25], x: 175, width: 160, status: "reserved", note: "申込" },
+  { id: "2503", name: "2503", floors: [25], x: 340, width: 180, status: "vacant", note: "2BR" },
+  { id: "2504", name: "2504", floors: [25], x: 525, width: 200, status: "maintenance", note: "改修" },
+  { id: "2505", name: "2505", floors: [25], x: 730, width: 205, status: "hold", note: "内見予定" },
+  {
+    id: "2506M", name: "2506 メゾネット", floors: [26, 25], x: 1085,
+    isMaisonette: true, align: "right", width: { top: 130, bottom: 260 },
+    status: "reserved", note: "3BR メゾネット",
+  },
+
+];
+
+const INITIAL_UNITS = {
+  hills: HILLS_UNITS,
+  sakura: SAKURA_UNITS,
+  aoyama: AOYAMA_UNITS,
+};
+
 export default function App() {
-  // レイアウト
-  const FLOORS = [17, 16, 15, 14]; // 上→下
+  // レイアウト共通
   const FLOOR_HEIGHT = 120;
-  const BUILDING_WIDTH = 1100;
   const PADDING_LEFT = 64;
   const PADDING_TOP = 20;
 
+  // 選択中の物件
+  const [currentPropertyId, setCurrentPropertyId] = useState("hills");
+  const currentProperty = PROPERTIES.find((p) => p.id === currentPropertyId) || PROPERTIES[0];
+  const FLOORS = currentProperty.floors;
+  const BUILDING_WIDTH = currentProperty.buildingWidth;
   const SVG_W = PADDING_LEFT + BUILDING_WIDTH + 24;
   const SVG_H = PADDING_TOP * 2 + FLOOR_HEIGHT * FLOORS.length;
 
@@ -51,71 +220,10 @@ export default function App() {
     []
   );
 
-  // サンプルデータ（x と width のみで指定）
-  const [units, setUnits] = useState(
-    () => [
-      // 17F
-      { id: "1701", name: "1701", floors: [17], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "田中太郎", startDate: "2023-04-01", endDate: "2025-03-31", rent: 85000, deposit: 170000 } },
-      { id: "1702", name: "1702", floors: [17], x: 145, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "佐藤花子", startDate: "2024-02-01", endDate: "2026-01-31", rent: 120000, deposit: 240000 } },
-      { id: "1703", name: "1703", floors: [17], x: 280, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "山田次郎", startDate: "2024-03-15", endDate: "2026-03-14", rent: 115000, deposit: 230000 } },
-      { id: "1704", name: "1704", floors: [17], x: 415, width: 130, status: "vacant", note: "LIGHT, 1BR" },
+  // 物件ごとの units を保持
+  const [propertyUnits, setPropertyUnits] = useState(INITIAL_UNITS);
 
-      // メゾネット（新仕様）— 左寄せ、上階の幅=180（上下同幅で縦長表示）
-        {
-          id: "1605",
-          name: "1605 メゾネット",
-          floors: [17, 16],
-          x: 550,
-          isMaisonette: true,
-          align: "left",
-          width: { top: 80, bottom: 180 }, // 上階の幅のみ指定（下階は自動的に同幅）
-          status: "reserved",
-          note: "DARK, 3BR メゾネット（左寄せ・上下異幅）",
-          contract: { tenant: "鈴木一郎", startDate: "2024-01-01", endDate: "2025-12-31", rent: 180000, deposit: 360000 }
-        },
-      { id: "1705", name: "1705", floors: [17], x: 635, width: 110, status: "vacant", note: "LIGHT, 1BR" },
-      { id: "1706", name: "1706", floors: [17], x: 750, width: 110, status: "vacant", note: "DARK, 1BR" },
-      { id: "1707", name: "1707", floors: [17], x: 865, width: 170, status: "model", note: "モデルルーム 2BR" },
-
-      // 16F
-      { id: "1601", name: "1601", floors: [16], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "高橋美咲", startDate: "2022-06-01", endDate: "2024-05-31", rent: 90000, deposit: 180000 } },
-      { id: "1602", name: "1602", floors: [16], x: 145, width: 130, status: "reserved", note: "DARK, 3BR", contract: { tenant: "伊藤健太", startDate: "2024-04-01", endDate: "2026-03-31", rent: 125000, deposit: 250000 } },
-      { id: "1603", name: "1603", floors: [16], x: 280, width: 130, status: "reserved", note: "LIGHT, 3BR", contract: { tenant: "中村由美", startDate: "2024-05-01", endDate: "2026-04-30", rent: 130000, deposit: 260000 } },
-      { id: "1604", name: "1604", floors: [16], x: 415, width: 130, status: "special", note: "SA" },
-      { id: "1606", name: "1606", floors: [16], x: 735, width: 160, status: "maintenance", note: "設備/工事" },
-      { id: "1607", name: "1607", floors: [16], x: 900, width: 135, status: "vacant", note: "DARK, 1BR" },
-
-      // 15F
-      { id: "1501", name: "1501", floors: [15], x: 10, width: 130, status: "reserved", note: "DARK, 2BR", contract: { tenant: "小林正雄", startDate: "2024-06-01", endDate: "2026-05-31", rent: 95000, deposit: 190000 } },
-      { id: "1502", name: "1502", floors: [15], x: 145, width: 130, status: "vacant", note: "LIGHT, 2BR" },
-      { id: "1503", name: "1503", floors: [15], x: 280, width: 130, status: "hold", note: "内見予定" },
-      { id: "1504", name: "1504", floors: [15], x: 415, width: 130, status: "reserved", note: "契約編集中", contract: { tenant: "斎藤真理", startDate: "2024-07-01", endDate: "2026-06-30", rent: 100000, deposit: 200000 } },
-      { id: "1505", name: "1505", floors: [15], x: 550, width: 180, status: "occupied", note: "長期賃貸", contract: { tenant: "株式会社ABC", startDate: "2021-01-01", endDate: "2026-12-31", rent: 200000, deposit: 400000 } },
-       { id: "1506", name: "1506", floors: [15], x: 735, width: 190, status: "special", note: "SA 2BR" },
-
-       // メゾネット（新仕様）— 右寄せ、上下の幅をそれぞれ指定
-       {
-         id: "1407",
-         name: "1407 メゾネット",
-         floors: [15, 14],
-         x: 930,
-         isMaisonette: true,
-         align: "right",
-         width: { top: 100, bottom: 180 }, // 上階50px、下階80px
-         status: "vacant",
-         note: "LIGHT, 3BR メゾネット（右寄せ・上下異幅）",
-       },
-
-      // 14F
-      { id: "1401", name: "1401", floors: [14], x: 10, width: 130, status: "occupied", note: "DARK, 2BR", contract: { tenant: "松本和子", startDate: "2023-09-01", endDate: "2025-08-31", rent: 88000, deposit: 176000 } },
-      { id: "1402", name: "1402", floors: [14], x: 145, width: 130, status: "vacant", note: "LIGHT, 2BR" },
-      { id: "1403", name: "1403", floors: [14], x: 280, width: 130, status: "maintenance", note: "リノベ中" },
-      { id: "1404", name: "1404", floors: [14], x: 415, width: 130, status: "reserved", note: "契約編集中", contract: { tenant: "田村健一", startDate: "2024-08-01", endDate: "2026-07-31", rent: 105000, deposit: 210000 } },
-      { id: "1405", name: "1405", floors: [14], x: 550, width: 180, status: "occupied", note: "長期賃貸", contract: { tenant: "株式会社XYZ", startDate: "2020-03-01", endDate: "2025-02-28", rent: 195000, deposit: 390000 } },
-      { id: "1406", name: "1406", floors: [14], x: 735, width: 110, status: "hold", note: "内見予定" },
-    ]
-  );
-
+  // 編集・選択
   const [selected, setSelected] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginData, setLoginData] = useState({ username: '', password: '' });
@@ -124,12 +232,13 @@ export default function App() {
   const [editData, setEditData] = useState({ status: '', note: '' });
   const [hasChanges, setHasChanges] = useState(false);
 
+  // 現在表示中の units（現在の物件に紐づく）
+  const units = propertyUnits[currentPropertyId] || [];
+
   // 認証関数
   const handleLogin = (e) => {
     e.preventDefault();
     setLoginError('');
-    
-    // シンプルな認証（実際のアプリでは適切な認証システムを使用）
     if (loginData.username === 'admin' && loginData.password === 'h@kamata') {
       setIsAuthenticated(true);
       setLoginData({ username: '', password: '' });
@@ -149,6 +258,16 @@ export default function App() {
     const { name, value } = e.target;
     setLoginData(prev => ({ ...prev, [name]: value }));
     if (loginError) setLoginError('');
+  };
+
+  // 物件選択
+  const handlePropertySelect = (propertyId) => {
+    if (propertyId === currentPropertyId) return;
+    setCurrentPropertyId(propertyId);
+    // 選択中の区画/編集状態はリセット
+    setSelected(null);
+    setIsEditing(false);
+    setHasChanges(false);
   };
 
   // 編集機能
@@ -176,8 +295,6 @@ export default function App() {
   const handleEditChange = (e) => {
     const { name, value } = e.target;
     setEditData(prev => ({ ...prev, [name]: value }));
-    
-    // 変更があったかチェック
     if (selected) {
       const hasStatusChange = name === 'status' && value !== selected.status;
       const hasNoteChange = name === 'note' && value !== (selected.note || '');
@@ -186,25 +303,15 @@ export default function App() {
   };
 
   const handleSave = () => {
-    if (selected) {
-      // 区画データを更新
-      setUnits(prevUnits => 
-        prevUnits.map(unit => 
-          unit.id === selected.id 
-            ? { ...unit, status: editData.status, note: editData.note }
-            : unit
-        )
-      );
-      
-      // 選択中の区画も更新
-      setSelected(prev => ({
-        ...prev,
-        status: editData.status,
-        note: editData.note
-      }));
-      
-      setHasChanges(false);
-    }
+    if (!selected) return;
+    setPropertyUnits(prev => ({
+      ...prev,
+      [currentPropertyId]: (prev[currentPropertyId] || []).map(u =>
+        u.id === selected.id ? { ...u, status: editData.status, note: editData.note } : u
+      ),
+    }));
+    setSelected(prev => prev ? ({ ...prev, status: editData.status, note: editData.note }) : prev);
+    setHasChanges(false);
   };
 
   const handleCancel = () => {
@@ -239,26 +346,17 @@ export default function App() {
     return top === bot ? `${top}F` : `${top}F–${bot}F（メゾネット）`;
   };
 
-  // テキストの折り返しと省略表示の関数
+  // テキストの折り返しと省略表示
   const formatMemoText = (text, maxWidth = 100) => {
     if (!text) return "";
-    
-    // より保守的な文字数計算（10pxフォントサイズを考慮）
-    const maxChars = Math.floor(maxWidth / 8); // 1文字約8pxと仮定（より保守的）
-    
-    if (text.length <= maxChars) {
-      return text;
-    }
-    
-    // 一行目と二行目に分割（より短めに設定）
-    const firstLineMaxChars = Math.floor(maxChars * 0.8); // 80%の長さ
+    const maxChars = Math.floor(maxWidth / 8);
+    if (text.length <= maxChars) return text;
+    const firstLineMaxChars = Math.floor(maxChars * 0.8);
     const firstLine = text.substring(0, firstLineMaxChars);
     const secondLine = text.substring(firstLineMaxChars);
-    
     if (secondLine.length <= firstLineMaxChars) {
       return [firstLine, secondLine];
     } else {
-      // 二行目も長い場合は省略
       return [firstLine, secondLine.substring(0, firstLineMaxChars - 3) + "..."];
     }
   };
@@ -285,24 +383,24 @@ export default function App() {
     // width の解釈
     let geom;
 
-     if (isMaisonette && u.floors?.length === 2) {
-       // 新仕様: メゾネットは align + 上下の幅をそれぞれ指定可能
-       const align =
-         (u.align || (typeof u.width === "object" ? u.width.align : null) || "left") === "right"
-           ? "right"
-           : "left";
-       let topW, bottomW;
-       if (typeof u.width === "number") {
-         topW = u.width;
-         bottomW = u.width; // 数値の場合は上下同幅
-       } else if (typeof u.width === "object") {
-         topW = u.width.top ?? u.width.both ?? 140;
-         bottomW = u.width.bottom ?? u.width.both ?? topW; // bottomが指定されていない場合はtopと同じ
-       } else {
-         topW = 140;
-         bottomW = 140;
-       }
-       geom = toLShape(topW, bottomW, align); // 上下の幅をそれぞれ指定
+    if (isMaisonette && u.floors?.length === 2) {
+      // 新仕様: メゾネットは align + 上下の幅をそれぞれ指定可能
+      const align =
+        (u.align || (typeof u.width === "object" ? u.width.align : null) || "left") === "right"
+          ? "right"
+          : "left";
+      let topW, bottomW;
+      if (typeof u.width === "number") {
+        topW = u.width;
+        bottomW = u.width; // 数値の場合は上下同幅
+      } else if (typeof u.width === "object") {
+        topW = u.width.top ?? u.width.both ?? 140;
+        bottomW = u.width.bottom ?? u.width.both ?? topW;
+      } else {
+        topW = 140;
+        bottomW = 140;
+      }
+      geom = toLShape(topW, bottomW, align); // 上下の幅をそれぞれ指定
     } else if (Array.isArray(u.width) && u.floors?.length === 2) {
       // 旧仕様: [top, bottom] => L字（左寄せ）
       geom = toLShape(u.width[0], u.width[1], "left");
@@ -324,21 +422,20 @@ export default function App() {
       geom.widthTop = clamp(geom.widthTop, 10, BUILDING_WIDTH - xPx);
       const right = xPx + geom.widthTop;
 
-       if (isMaisonette && u.floors?.length === 2) {
-         // 新仕様: 上下の幅をそれぞれ制限（左寄せ/右寄せいずれでも）
-         if (geom.align === "left") {
-           geom.widthBottom = clamp(geom.widthBottom, 10, BUILDING_WIDTH - xPx);
-         } else {
-           // 右寄せの場合、下段の左端が0以上になるように調整
-           const right = xPx + geom.widthTop;
-           geom.widthBottom = clamp(geom.widthBottom, 10, right);
-         }
-       } else {
+      if (isMaisonette && u.floors?.length === 2) {
+        // 新仕様: 上下の幅をそれぞれ制限
+        if (geom.align === "left") {
+          geom.widthBottom = clamp(geom.widthBottom, 10, BUILDING_WIDTH - xPx);
+        } else {
+          // 右寄せ: 下段の左端が0以上になるように調整
+          const right = xPx + geom.widthTop;
+          geom.widthBottom = clamp(geom.widthBottom, 10, right);
+        }
+      } else {
         // 旧仕様: 下段幅の制限
         if (geom.align === "left") {
           geom.widthBottom = clamp(geom.widthBottom, 10, BUILDING_WIDTH - xPx);
         } else {
-          // 右端は上段の右端に合わせる。下段左端 >= 0 となるように調整
           geom.widthBottom = clamp(geom.widthBottom, 10, right);
         }
       }
@@ -347,7 +444,7 @@ export default function App() {
     return { ...u, xPx, geom, isMaisonette };
   };
 
-  const normalizedUnits = useMemo(() => units.map(normalizeUnit), [units]);
+  const normalizedUnits = useMemo(() => units.map(normalizeUnit), [units, BUILDING_WIDTH, FLOORS]);
 
   // メゾネットL字パス（2層想定）: hairline防止で0.5px補正
   const makeMaisonetteLPath = ({ x, topFloor, widthTop, widthBottom, align }) => {
@@ -441,11 +538,36 @@ export default function App() {
         </button>
       </header>
 
-      <main className={`layout ${selected ? 'with-panel' : 'without-panel'}`}>
+      <main className={`layout with-left ${selected ? 'with-panel' : ''}`}>
+        {/* 左サイド：物件選択 */}
+        <aside className="property-panel" aria-label="物件一覧">
+          <h3 className="property-title">物件</h3>
+          <div className="property-list">
+            {PROPERTIES.map((p) => {
+              const isActive = p.id === currentPropertyId;
+              return (
+                <button
+                  key={p.id}
+                  className={`property-item ${isActive ? 'active' : ''}`}
+                  onClick={() => handlePropertySelect(p.id)}
+                  aria-pressed={isActive}
+                >
+                  <div className="property-name">{p.name}</div>
+                  <div className="property-meta">
+                    <span>{p.floors[0]}F–{p.floors[p.floors.length - 1]}F</span>
+                    <span>幅 {p.buildingWidth}px</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        {/* 中央：キャンバス */}
         <section className="canvas-wrap" role="region" aria-label="区画断面図" onClick={(e) => e.stopPropagation()}>
           <div className="building-header">
             <div className="building-icon">🏢</div>
-            <h1 className="building-name">〇〇ヒルズ</h1>
+            <h1 className="building-name">{currentProperty.name}</h1>
           </div>
           <div className="legend-section">
             <Legend STATUS_BASE={STATUS_BASE} />
@@ -543,54 +665,54 @@ export default function App() {
                       ry="12"
                       onClick={onClick}
                     />
-                     <text
-                       x={x + w / 2}
-                       y={y + height / 2 + 4}
-                       textAnchor="middle"
-                       className="unit-label"
-                       style={{ fill: "#111827" }}
-                     >
-                       {u.name}
-                     </text>
-                     {(() => {
-                       const memoText = formatMemoText(u.note, Math.max(w - 20, 60)); // パディングを考慮
-                       if (Array.isArray(memoText)) {
-                         return (
-                           <>
-                             <text
-                               x={x + w / 2}
-                               y={y + height / 2 + 15}
-                               textAnchor="middle"
-                               className="unit-memo"
-                               style={{ fill: "#6b7280", fontSize: "9px" }}
-                             >
-                               {memoText[0]}
-                             </text>
-                             <text
-                               x={x + w / 2}
-                               y={y + height / 2 + 28}
-                               textAnchor="middle"
-                               className="unit-memo"
-                               style={{ fill: "#6b7280", fontSize: "9px" }}
-                             >
-                               {memoText[1]}
-                             </text>
-                           </>
-                         );
-                       } else {
-                         return (
-                           <text
-                             x={x + w / 2}
-                             y={y + height / 2 + 15}
-                             textAnchor="middle"
-                             className="unit-memo"
-                             style={{ fill: "#6b7280", fontSize: "9px" }}
-                           >
-                             {memoText}
-                           </text>
-                         );
-                       }
-                     })()}
+                    <text
+                      x={x + w / 2}
+                      y={y + height / 2 + 4}
+                      textAnchor="middle"
+                      className="unit-label"
+                      style={{ fill: "#111827" }}
+                    >
+                      {u.name}
+                    </text>
+                    {(() => {
+                      const memoText = formatMemoText(u.note, Math.max(w - 20, 60));
+                      if (Array.isArray(memoText)) {
+                        return (
+                          <>
+                            <text
+                              x={x + w / 2}
+                              y={y + height / 2 + 15}
+                              textAnchor="middle"
+                              className="unit-memo"
+                              style={{ fill: "#6b7280", fontSize: "9px" }}
+                            >
+                              {memoText[0]}
+                            </text>
+                            <text
+                              x={x + w / 2}
+                              y={y + height / 2 + 28}
+                              textAnchor="middle"
+                              className="unit-memo"
+                              style={{ fill: "#6b7280", fontSize: "9px" }}
+                            >
+                              {memoText[1]}
+                            </text>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <text
+                            x={x + w / 2}
+                            y={y + height / 2 + 15}
+                            textAnchor="middle"
+                            className="unit-memo"
+                            style={{ fill: "#6b7280", fontSize: "9px" }}
+                          >
+                            {memoText}
+                          </text>
+                        );
+                      }
+                    })()}
                   </g>
                 );
               }
@@ -612,18 +734,9 @@ export default function App() {
                 });
 
                 const xLeft = PADDING_LEFT + u.xPx;
-                const yTop = yForFloorTop(topFloor) + 1;
-                
-                // 下の階の区画の真ん中に表示
-                let labelX;
-                if (u.geom.align === "right") {
-                  // 右寄せの場合、下の階の右端から下の階の幅の半分の位置
-                  const bottomRight = xLeft + u.geom.widthTop;
-                  labelX = bottomRight - u.geom.widthBottom / 2;
-                } else {
-                  // 左寄せの場合、下の階の左端から下の階の幅の半分の位置
-                  labelX = xLeft + u.geom.widthBottom / 2;
-                }
+                const labelX = u.geom.align === "right"
+                  ? (xLeft + u.geom.widthTop) - u.geom.widthBottom / 2
+                  : xLeft + u.geom.widthBottom / 2;
                 const labelY = yForFloorTop(bottomFloor) + FLOOR_HEIGHT / 2 + 4;
 
                 return (
@@ -645,7 +758,7 @@ export default function App() {
                       {u.name}
                     </text>
                     {(() => {
-                      const memoText = formatMemoText(u.note, Math.max(u.geom.widthBottom - 20, 60)); // パディングを考慮
+                      const memoText = formatMemoText(u.note, Math.max(u.geom.widthBottom - 20, 60));
                       if (Array.isArray(memoText)) {
                         return (
                           <>
@@ -728,6 +841,7 @@ export default function App() {
           </svg>
         </section>
 
+        {/* 右サイド：詳細 */}
         {selected && (
           <aside className="side-panel">
             <div className="detail">
@@ -848,7 +962,7 @@ function Legend({ STATUS_BASE }) {
   );
 }
 
-/** スタイル（元コードのまま） */
+/** スタイル（左サイド用クラスを追加） */
 function Style() {
   return (
     <style>{`
@@ -1034,20 +1148,24 @@ function Style() {
     border-radius:3px; 
     display:inline-block; 
   }
-   .layout {
-     display:grid; 
-     grid-template-columns: 1fr; 
-     gap:16px; 
-     padding:16px; 
-     width:100%; 
-     max-width:1400px; 
-     margin:0 auto;
-     flex: 1;
-     transition: all 0.3s ease;
-   }
-   .layout.with-panel {
-     grid-template-columns: 1fr 340px;
-   }
+  .layout {
+    display:grid; 
+    grid-template-columns: 1fr; 
+    gap:16px; 
+    padding:16px; 
+    width:100%; 
+    max-width:1400px; 
+    margin:0 auto;
+    flex: 1;
+    transition: all 0.3s ease;
+  }
+  /* 左サイドがある前提のレイアウト */
+  .layout.with-left {
+    grid-template-columns: 240px 1fr;
+  }
+  .layout.with-left.with-panel {
+    grid-template-columns: 240px 1fr 340px;
+  }
   .canvas-wrap {
     background:var(--panel); 
     border:1px solid var(--border); 
@@ -1056,36 +1174,36 @@ function Style() {
     padding:12px;
     box-shadow: var(--shadow);
   }
-   .building-header {
-     display: flex;
-     align-items: center;
-     gap: 12px;
-     margin-bottom: 16px;
-     padding: 16px 20px;
-     background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-     border-radius: 12px;
-     border: 1px solid var(--border);
-     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-   }
-   .building-icon {
-     font-size: 32px;
-     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-   }
-   .building-name {
-     font-size: 24px;
-     font-weight: 700;
-     color: var(--primary);
-     margin: 0;
-     letter-spacing: 0.5px;
-     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-   }
-   .legend-section {
-     margin-bottom: 16px;
-     padding: 12px;
-     background: #f8fafc;
-     border-radius: 8px;
-     border: 1px solid var(--border);
-   }
+  .building-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  .building-icon {
+    font-size: 32px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  }
+  .building-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 0;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  .legend-section {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
   .compass-bar {
     display: flex;
     justify-content: space-between;
@@ -1121,50 +1239,26 @@ function Style() {
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
-   .side-panel {
-     background:var(--panel); 
-     border:1px solid var(--border); 
-     border-radius:16px; 
-     padding:20px;
-     box-shadow: var(--shadow);
-     height: fit-content;
-     position: sticky;
-     top: 100px;
-     animation: slideIn 0.3s ease;
-   }
-   @keyframes slideIn {
-     from {
-       opacity: 0;
-       transform: translateX(20px);
-     }
-     to {
-       opacity: 1;
-       transform: translateX(0);
-     }
-   }
-  h2 { 
-    font-size:16px; 
-    margin:0 0 16px; 
-    color: var(--text);
-    font-weight: 600;
+  .side-panel {
+    background:var(--panel); 
+    border:1px solid var(--border); 
+    border-radius:16px; 
+    padding:20px;
+    box-shadow: var(--shadow);
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    animation: slideIn 0.3s ease;
   }
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
   }
-  .empty-icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-  .muted { 
-    color:var(--muted); 
-    margin: 0;
-  }
-  .detail { 
-    display:grid; 
-    gap:12px; 
-  }
+  h2 { font-size:16px; margin:0 0 16px; color: var(--text); font-weight: 600; }
+  .empty-state { text-align: center; padding: 40px 20px; }
+  .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .muted { color:var(--muted); margin: 0; }
+  .detail { display:grid; gap:12px; }
   .detail-header {
     display: flex;
     justify-content: space-between;
@@ -1173,293 +1267,137 @@ function Style() {
     padding-bottom: 12px;
     border-bottom: 1px solid var(--border);
   }
-  .detail-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
+  .detail-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: var(--primary); }
+  .close-btn {
+    background: none; border: none; font-size: 24px; color: var(--muted);
+    cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s ease;
+  }
+  .close-btn:hover { background: var(--border); color: var(--text); }
+  .row { display:flex; gap:12px; align-items:center; padding: 8px 0; }
+  .k { width:100px; color:#6b7280; font-weight: 500; font-size: 13px; }
+  .v { flex:1; font-weight: 500; }
+  .status-badge { color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .grid-line { stroke: var(--line); stroke-width:1; }
+  .outline { fill:#ffffff; stroke:#e5e7eb; stroke-width:1; }
+  .floor-label { fill:#64748b; font-size:12px; }
+  .unit { transition: all .2s ease; }
+  .unit:hover { transform: translateY(-2px); }
+  .unit.selected { transform: translateY(-2px) scale(1.02); }
+  .unit-label { fill:#111827; font-weight:700; font-size:12px; pointer-events:none; }
+  .unit-memo { fill:#6b7280; font-weight:500; font-size:10px; pointer-events:none; }
+  .contract-section { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .contract-section h4 { font-size: 14px; font-weight: 600; color: var(--primary); margin: 0 0 12px 0; }
+  .contract-details { display: grid; gap: 8px; }
+  .edit-actions { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: flex-end; }
+  .edit-btn, .save-btn, .cancel-btn {
+    padding: 8px 16px; border-radius: 6px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent;
+  }
+  .edit-btn { background: var(--primary); color: white; border-color: var(--primary); }
+  .edit-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .save-btn { background: var(--primary); color: white; border-color: var(--primary); }
+  .save-btn:hover { background: #1d4ed8; border-color: #1d4ed8; }
+  .cancel-btn { background: #6b7280; color: white; border-color: #6b7280; }
+  .cancel-btn:hover { background: #4b5563; border-color: #4b5563; }
+  .edit-select {
+    width: 100%; padding: 6px 12px; border: 2px solid #e5e7eb; border-radius: 6px;
+    font-size: 14px; background: white; cursor: pointer; transition: border-color 0.2s ease;
+  }
+  .edit-select:focus { outline: none; border-color: var(--primary); }
+  .edit-textarea {
+    width: 100%; padding: 8px 12px; border: 2px solid #e5e7eb; border-radius: 6px;
+    font-size: 14px; font-family: inherit; resize: vertical; min-height: 60px; transition: border-color 0.2s ease;
+  }
+  .edit-textarea:focus { outline: none; border-color: var(--primary); }
+  .unit-shape { cursor:pointer; stroke-width:2; vector-effect: non-scaling-stroke; shape-rendering: geometricPrecision; transition: all 0.2s ease; }
+  .unit-shape:hover { stroke-width: 3; }
+  .unit.selected .unit-shape { stroke-width: 4; filter: brightness(1.05); }
+  .unit-shape-l { stroke-linejoin: round; stroke-linecap: round; }
+
+  /* 物件サイドパネル */
+  .property-panel {
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:12px;
+    box-shadow: var(--shadow);
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    align-self: start;
+  }
+  .property-title {
+    margin: 8px 8px 12px 8px;
+    font-size: 14px;
+    font-weight: 700;
     color: var(--primary);
   }
-  .close-btn {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-  }
-  .close-btn:hover {
-    background: var(--border);
-    color: var(--text);
-  }
-  .row { 
-    display:flex; 
-    gap:12px; 
-    align-items:center;
-    padding: 8px 0;
-  }
-  .k { 
-    width:100px; 
-    color:#6b7280;
-    font-weight: 500;
-    font-size: 13px;
-  }
-  .v { 
-    flex:1; 
-    font-weight: 500;
-  }
-  .status-badge {
-    color: white;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-  }
-  .grid-line { 
-    stroke: var(--line); 
-    stroke-width:1; 
-  }
-  .outline { 
-    fill:#ffffff; 
-    stroke:#e5e7eb; 
-    stroke-width:1; 
-  }
-  .floor-label { 
-    fill:#64748b; 
-    font-size:12px; 
-  }
-  .unit { 
-    transition: all .2s ease; 
-  }
-  .unit:hover { 
-    transform: translateY(-2px); 
-  }
-  .unit.selected {
-    transform: translateY(-2px) scale(1.02);
-  }
-   .unit-label { 
-     fill:#111827; 
-     font-weight:700; 
-     font-size:12px; 
-     pointer-events:none; 
-   }
-   .unit-memo { 
-     fill:#6b7280; 
-     font-weight:500; 
-     font-size:10px; 
-     pointer-events:none; 
-   }
-   .contract-section {
-     margin-top: 20px;
-     padding-top: 16px;
-     border-top: 1px solid var(--border);
-   }
-   .contract-section h4 {
-     font-size: 14px;
-     font-weight: 600;
-     color: var(--primary);
-     margin: 0 0 12px 0;
-   }
-  .contract-details {
-    display: grid;
+  .property-list {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
   }
-  .edit-actions {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-  }
-  .edit-btn, .save-btn, .cancel-btn {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
-  }
-  .edit-btn {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-  }
-  .edit-btn:hover {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-  }
-  .save-btn {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-  }
-  .save-btn:hover {
-    background: #1d4ed8;
-    border-color: #1d4ed8;
-  }
-  .cancel-btn {
-    background: #6b7280;
-    color: white;
-    border-color: #6b7280;
-  }
-  .cancel-btn:hover {
-    background: #4b5563;
-    border-color: #4b5563;
-  }
-  .edit-select {
+  .property-item {
     width: 100%;
-    padding: 6px 12px;
-    border: 2px solid #e5e7eb;
-    border-radius: 6px;
-    font-size: 14px;
-    background: white;
+    text-align: left;
+    background: #ffffff;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding: 10px 12px;
     cursor: pointer;
-    transition: border-color 0.2s ease;
+    transition: all .2s ease;
   }
-  .edit-select:focus {
-    outline: none;
+  .property-item:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-1px);
+  }
+  .property-item.active {
     border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light) inset;
   }
-  .edit-textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 2px solid #e5e7eb;
-    border-radius: 6px;
-    font-size: 14px;
-    font-family: inherit;
-    resize: vertical;
-    min-height: 60px;
-    transition: border-color 0.2s ease;
+  .property-name {
+    font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px;
   }
-  .edit-textarea:focus {
-    outline: none;
-    border-color: var(--primary);
+  .property-meta {
+    display: flex; gap: 8px; color: var(--muted); font-size: 12px;
   }
-  .unit-shape {
-    cursor:pointer;
-    stroke-width:2;
-    vector-effect: non-scaling-stroke;
-    shape-rendering: geometricPrecision;
-    transition: all 0.2s ease;
-  }
-  .unit-shape:hover {
-    stroke-width: 3;
-  }
-  .unit.selected .unit-shape {
-    stroke-width: 4;
-    filter: brightness(1.05);
-  }
-  .unit-shape-l { 
-    stroke-linejoin: round; 
-    stroke-linecap: round; 
-  }
+
   @media (max-width: 1200px) {
-    .layout { 
-      grid-template-columns: 1fr 300px; 
-      gap: 12px;
-    }
-    .legend {
-      flex-direction: column;
-      gap: 6px;
-    }
-    .app-header {
-      flex-direction: column;
-      align-items: stretch;
-      gap: 12px;
-    }
+    .layout { gap: 12px; }
+    .layout.with-left { grid-template-columns: 1fr; }
+    .layout.with-left.with-panel { grid-template-columns: 1fr; }
+    .property-panel { position: static; }
+    .legend { flex-direction: column; gap: 6px; }
+    .app-header { flex-direction: column; align-items: stretch; gap: 12px; }
   }
   @media (max-width: 960px) {
-    .layout { 
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-    .side-panel {
-      position: static;
-      order: -1;
-    }
-    .app-header {
-      padding: 12px;
-    }
-    .title {
-      flex-direction: column;
-      gap: 4px;
-    }
-    .brand {
-      font-size: 16px;
-    }
-    .legend {
-      justify-content: center;
-    }
+    .layout { grid-template-columns: 1fr; gap: 12px; }
+    .side-panel { position: static; order: -1; }
+    .app-header { padding: 12px; }
+    .title { flex-direction: column; gap: 4px; }
+    .brand { font-size: 16px; }
+    .legend { justify-content: center; }
   }
-   @media (max-width: 640px) {
-     .layout {
-       padding: 12px;
-     }
-     .canvas-wrap {
-       padding: 8px;
-     }
-     .side-panel {
-       padding: 16px;
-     }
-     .building-header {
-       padding: 12px 16px;
-       margin-bottom: 12px;
-     }
-     .building-icon {
-       font-size: 24px;
-     }
-     .building-name {
-       font-size: 18px;
-     }
-     .legend {
-       gap: 4px;
-     }
-     .badge {
-       padding: 4px 8px;
-       font-size: 11px;
-     }
-     .compass-bar {
-       padding: 8px 4px;
-       gap: 2px;
-       width: 100%;
-       margin-left: 0;
-       margin-right: 0;
-     }
-     .compass-item {
-       font-size: 10px;
-       padding: 3px 6px;
-       min-width: 40px;
-       max-width: 60px;
-     }
-     .detail-header h3 {
-       font-size: 16px;
-     }
-     .k {
-       width: 80px;
-       font-size: 12px;
-     }
-     .v {
-       font-size: 13px;
-     }
-   }
+  @media (max-width: 640px) {
+    .layout { padding: 12px; }
+    .canvas-wrap { padding: 8px; }
+    .side-panel { padding: 16px; }
+    .building-header { padding: 12px 16px; margin-bottom: 12px; }
+    .building-icon { font-size: 24px; }
+    .building-name { font-size: 18px; }
+    .legend { gap: 4px; }
+    .badge { padding: 4px 8px; font-size: 11px; }
+    .compass-bar { padding: 8px 4px; gap: 2px; width: 100%; margin-left: 0; margin-right: 0; }
+    .compass-item { font-size: 10px; padding: 3px 6px; min-width: 40px; max-width: 60px; }
+    .detail-header h3 { font-size: 16px; }
+    .k { width: 80px; font-size: 12px; }
+    .v { font-size: 13px; }
+  }
   @media (max-width: 480px) {
-    .app-header {
-      padding: 8px;
-    }
-    .layout {
-      padding: 8px;
-    }
-    .row {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 4px;
-    }
-    .k {
-      width: auto;
-    }
+    .app-header { padding: 8px; }
+    .layout { padding: 8px; }
+    .row { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .k { width: auto; }
   }
   `}</style>
   );
