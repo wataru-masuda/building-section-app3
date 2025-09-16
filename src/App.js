@@ -16,7 +16,7 @@ import React, { useMemo, useState } from "react";
 
 // 物件定義
 const PROPERTIES = [
-  { id: "hills", name: "〇〇ヒルズ", floors: [17, 16, 15, 14], buildingWidth: 1100 },
+  { id: "hills", name: "西麻布台ヒルズレジデンスA", floors: [17, 16, 15, 14], buildingWidth: 1100 },
   { id: "aoyama", name: "青山タワー", floors: [28, 27, 26, 25], buildingWidth: 1200 },
 ];
 
