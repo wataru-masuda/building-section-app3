@@ -846,7 +846,15 @@ export default function App() {
           <aside className="side-panel">
             <div className="detail">
               <div className="detail-header">
-                <h3>{selected.name}</h3>
+              <h3>
+                <a
+                  href="https://app.chikyu.net/org/11751/custom_object/kukaku/record/68c7c0dbe02b05fce5aec409"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {selected.name}
+                </a>
+              </h3>
                 <button 
                   className="close-btn"
                   onClick={() => setSelected(null)}
